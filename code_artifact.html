@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Трекер Привычек — Панель Достижений</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.25s ease, color 0.25s ease;
+        }
+
+        /* Анимация галочки чекбокса */
+        @keyframes checkPop {
+            0% { transform: scale(0.8); }
+            50% { transform: scale(1.18); }
+            100% { transform: scale(1); }
+        }
+        .animate-check {
+            animation: checkPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        /* Пульсация огонька стрика */
+        @keyframes flamePulse {
+            0%, 100% { transform: scale(1) rotate(-2deg); filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.4)); }
+            50% { transform: scale(1.12) rotate(2deg); filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.75)); }
+        }
+        .flame-active {
+            display: inline-block;
+            animation: flamePulse 2s infinite ease-in-out;
+        }
+
+        /* Плавный скроллбар */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.3);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.5);
+        }
+
+        /* Стеклянный эффект */
+        .glass-card {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        /* Плавное заполнение SVG круга */
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-screen selection:bg-indigo-500 selection:text-white pb-12">
+
+    <!-- Декоративное фоновое свечение -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div class="absolute -top-24 -left-24 w-96 h-96 bg-indigo-500/10 dark:bg-indigo-500/15 rounded-full blur-3xl"></div>
+        <div class="absolute top-1/3 -right-24 w-96 h-96 bg-emerald-500/10 dark:bg-emerald-500/10 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-24 left-1/3 w-96 h-96 bg-purple-500/10 dark:bg-purple-500/10 rounded-full blur-3xl"></div>
+    </div>
+
+    <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        
+        <!-- Верхняя шапка -->
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-slate-200/80 dark:border-slate-800/80">
+            <div class="flex items-center gap-3.5">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-emerald-500 p-0.5 shadow-lg shadow-indigo-500/20">
+                    <div class="w-full h-full bg-white dark:bg-slate-900 rounded-[14px] flex items-center justify-center text-2xl">
+                        ⚡
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2.5">
+                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-indigo-800 to-slate-900 dark:from-white dark:via-indigo-200 dark:to-emerald-200">
+                            Импульс Привычек
+                        </h1>
+                        <span id="headerStatusBadge" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300 border border-indigo-500/20">
+                            ✨ Активный режим
+                        </span>
+                    </div>
+                    <p id="currentDateDisplay" class="text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                        Загрузка даты...
+                    </p>
+                </div>
+            </div>
+
+            <!-- Кнопки управления -->
+            <div class="flex flex-wrap items-center gap-2.5">
+                <button onclick="openAddModal()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white shadow-md shadow-indigo-500/25 transition-all cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                    </svg>
+                    <span>Новая привычка</span>
+                </button>
+
+                <button onclick="openResetModal()" title="Восстановить исходные демо-данные" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl font-medium text-sm bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 shadow-sm transition-all cursor-pointer">
+                    <svg class="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+                    </svg>
+                    <span class="hidden sm:inline">Сбросить демо</span>
+                </button>
+
+                <button id="themeToggleBtn" onclick="toggleTheme()" aria-label="Переключить тему" class="p-2.5 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 shadow-sm transition-all cursor-pointer">
+                    <!-- Иконка солнца (для темной темы) -->
+                    <svg id="sunIcon" class="w-5 h-5 text-amber-400 hidden dark:block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/>
+                    </svg>
+                    <!-- Иконка луны (для светлой темы) -->
+                    <svg id="moonIcon" class="w-5 h-5 text-indigo-600 block dark:hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Верхняя панель сводки и мотивации (4 карточки) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+            
+            <!-- Карточка 1: Прогресс дня с круговой диаграммой -->
+            <div class="bg-white/90 dark:bg-slate-900/90 glass-card rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Фокус сегодня</span>
+                    <div class="flex items-baseline gap-2 mt-1">
+                        <span id="todayPercentText" class="text-3xl font-extrabold text-slate-900 dark:text-white">0%</span>
+                        <span id="todayFractionText" class="text-xs font-semibold text-slate-500 dark:text-slate-400">(0 из 0)</span>
+                    </div>
+                    <p id="todaySubStatus" class="text-xs font-medium text-emerald-600 dark:text-emerald-400 mt-1.5">
+                        Отличное начало!
+                    </p>
+                </div>
+                <div class="relative w-16 h-16 flex items-center justify-center shrink-0">
+                    <svg class="w-16 h-16" viewBox="0 0 64 64">
+                        <circle class="text-slate-100 dark:text-slate-800" stroke-width="6" stroke="currentColor" fill="transparent" r="26" cx="32" cy="32"/>
+                        <circle id="todayProgressRing" class="progress-ring-circle text-indigo-600 dark:text-indigo-400" stroke-width="6" stroke-dasharray="163.36" stroke-dashoffset="163.36" stroke-linecap="round" stroke="currentColor" fill="transparent" r="26" cx="32" cy="32"/>
+                    </svg>
+                    <span id="todayRingIcon" class="absolute text-lg">🎯</span>
+                </div>
+            </div>
+
+            <!-- Карточка 2: Лучшая серия (Рекордный стрик) -->
+            <div class="bg-white/90 dark:bg-slate-900/90 glass-card rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Лучшая серия</span>
+                    <div class="flex items-baseline gap-1.5 mt-1">
+                        <span id="bestStreakValue" class="text-3xl font-extrabold text-orange-500 dark:text-orange-400">0</span>
+                        <span id="bestStreakUnit" class="text-sm font-semibold text-slate-500 dark:text-slate-400">дней подряд</span>
+                    </div>
+                    <p id="bestStreakHabitName" class="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-[180px]">
+                        Пока нет активных серий
+                    </p>
+                </div>
+                <div class="w-13 h-13 p-3 rounded-2xl bg-orange-500/10 dark:bg-orange-500/15 border border-orange-500/20 flex items-center justify-center text-2xl shrink-0">
+                    <span class="flame-active">🔥</span>
+                </div>
+            </div>
+
+            <!-- Карточка 3: Выполнение за неделю -->
+            <div class="bg-white/90 dark:bg-slate-900/90 glass-card rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">За 7 дней</span>
+                    <div class="flex items-baseline gap-2 mt-1">
+                        <span id="weeklyRateValue" class="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">0%</span>
+                        <span id="weeklyTotalChecks" class="text-xs font-semibold text-slate-500 dark:text-slate-400">0 отметок</span>
+                    </div>
+                    <p id="weeklyComparisonText" class="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1.5">
+                        Стабильный ритм недели
+                    </p>
+                </div>
+                <div class="w-13 h-13 p-3 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-2xl shrink-0">
+                    📈
+                </div>
+            </div>
+
+            <!-- Карточка 4: Мотивационный статус и Бейджи -->
+            <div class="bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 rounded-2xl p-5 text-white shadow-md shadow-indigo-500/20 flex flex-col justify-between relative overflow-hidden">
+                <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-200">Статус дня</span>
+                        <h3 id="motivationTitle" class="text-base font-bold mt-0.5 leading-snug">Включаемся в поток!</h3>
+                    </div>
+                    <span id="motivationEmoji" class="text-2xl">🚀</span>
+                </div>
+                <div id="badgesContainer" class="flex flex-wrap gap-1.5 mt-3">
+                    <!-- Динамические мини-бейджи -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Основная сетка: Левая колонка (Цели на сегодня) + Правая колонка (Сетка 7 дней и График) -->
+        <main class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+            
+            <!-- ЛЕВАЯ КОЛОНКА: Цели на сегодня (5 колонок на десктопе) -->
+            <section class="lg:col-span-5 flex flex-col gap-6">
+                <div class="bg-white/95 dark:bg-slate-900/95 glass-card rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex flex-col h-full">
+                    
+                    <!-- Заголовок секции и фильтр категорий -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800/80">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h2 class="text-lg font-bold text-slate-900 dark:text-white">Цели на сегодня</h2>
+                                <span id="todayCounterPill" class="px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300">
+                                    0/0
+                                </span>
+                            </div>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                Отмечайте привычки одним кликом
+                            </p>
+                        </div>
+
+                        <!-- Быстрая кнопка отметить все / добавить -->
+                        <button onclick="openAddModal()" class="self-start sm:self-auto inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800/60 transition cursor-pointer">
+                            <span>+ Добавить цель</span>
+                        </button>
+                    </div>
+
+                    <!-- Линейный прогресс-бар на сегодня -->
+                    <div class="mt-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-3.5 border border-slate-200/60 dark:border-slate-800">
+                        <div class="flex items-center justify-between text-xs font-semibold mb-2">
+                            <span id="progressBarMessage" class="text-slate-700 dark:text-slate-300">Прогресс закрытия целей</span>
+                            <span id="progressBarLabel" class="text-indigo-600 dark:text-indigo-400 font-bold">0%</span>
+                        </div>
+                        <div class="w-full h-3 bg-slate-200 dark:bg-slate-700/80 rounded-full overflow-hidden p-0.5">
+                            <div id="todayLinearBar" class="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 transition-all duration-500 ease-out" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Фильтры по категориям -->
+                    <div id="categoryFilterBar" class="flex items-center gap-1.5 overflow-x-auto py-3 no-scrollbar">
+                        <!-- Заполняется через JS -->
+                    </div>
+
+                    <!-- Список привычек на сегодня -->
+                    <div id="todayHabitsList" class="flex flex-col gap-3 mt-1 flex-1">
+                        <!-- Заполняется через JS -->
+                    </div>
+
+                    <!-- Форма быстрого добавления внизу карточки -->
+                    <form id="quickAddForm" onsubmit="handleQuickAdd(event)" class="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2">
+                        <input 
+                            type="text" 
+                            id="quickAddInput" 
+                            placeholder="Быстро добавить привычку (напр., Медитация 10 мин)..." 
+                            maxlength="60"
+                            class="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-100 dark:bg-slate-800/90 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none transition"
+                        >
+                        <button type="submit" class="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-white text-sm font-semibold shrink-0 transition cursor-pointer">
+                            Добавить
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- ПРАВАЯ КОЛОНКА: Матрица за 7 дней и График активности (7 колонок на десктопе) -->
+            <section class="lg:col-span-7 flex flex-col gap-6">
+                
+                <!-- Блок 1: Интерактивная матрица за 7 дней (Пн–Вс) -->
+                <div class="bg-white/95 dark:bg-slate-900/95 glass-card rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800/80">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h2 class="text-lg font-bold text-slate-900 dark:text-white">Матрица серий за 7 дней</h2>
+                                <span class="text-xs px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
+                                    Интерактивно
+                                </span>
+                            </div>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                Нажимайте на любую ячейку, чтобы отметить или снять выполнение за прошлые дни недели
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                            <span class="inline-flex items-center gap-1.5">
+                                <span class="w-3 h-3 rounded bg-indigo-500 inline-block"></span> Выполнено
+                            </span>
+                            <span class="inline-flex items-center gap-1.5">
+                                <span class="w-3 h-3 rounded bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 inline-block"></span> Пропуск
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Таблица-сетка за 7 дней -->
+                    <div class="overflow-x-auto mt-4 -mx-2 px-2">
+                        <table class="w-full min-w-[540px] text-left border-collapse">
+                            <thead>
+                                <tr id="weeklyTableHeader" class="border-b border-slate-100 dark:border-slate-800/80 text-xs font-semibold text-slate-400 dark:text-slate-500">
+                                    <!-- Заполняется через JS (Привычка | Пн .. Вс | Стрик) -->
+                                </tr>
+                            </thead>
+                            <tbody id="weeklyTableBody" class="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
+                                <!-- Заполняется через JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Блок 2: Визуальный график активности за 7 дней -->
+                <div class="bg-white/95 dark:bg-slate-900/95 glass-card rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex-1 flex flex-col justify-between">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800/80">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Динамика продуктивности за неделю</h2>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                График процента и количества закрытых привычек по дням недели
+                            </p>
+                        </div>
+
+                        <!-- Переключатель вида графика: Столбчатый / Плавная волна -->
+                        <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800/90 self-start sm:self-auto">
+                            <button id="chartModeBarBtn" onclick="setChartMode('bar')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm">
+                                Столбцы
+                            </button>
+                            <button id="chartModeLineBtn" onclick="setChartMode('area')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                                Плавный график
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Контейнер графика -->
+                    <div class="mt-5 relative">
+                        <!-- Вид 1: Столбчатая диаграмма -->
+                        <div id="barChartContainer" class="grid grid-cols-7 gap-2 sm:gap-4 items-end h-52 pt-6 px-1">
+                            <!-- Генерируется через JS -->
+                        </div>
+
+                        <!-- Вид 2: Плавный SVG-график (Area Spline Chart) -->
+                        <div id="areaChartContainer" class="hidden h-52 flex flex-col justify-between pt-2">
+                            <div id="svgChartWrapper" class="w-full h-40 relative">
+                                <!-- SVG генерируется через JS -->
+                            </div>
+                            <div id="areaChartLabels" class="grid grid-cols-7 gap-2 text-center mt-2">
+                                <!-- Подписи дней генерируются через JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Нижняя панель аналитики по категориям -->
+                    <div class="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div id="categoryBreakdownList" class="flex flex-wrap items-center gap-2">
+                            <!-- Генерируется через JS -->
+                        </div>
+                        <div id="bestDayInsight" class="text-slate-500 dark:text-slate-400 font-medium">
+                            <!-- Лучший день недели -->
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО: Добавление новой привычки -->
+    <div id="addHabitModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl transform transition-all">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">Новая привычка</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Настройте иконку и категорию для отслеживания</p>
+                </div>
+                <button onclick="closeAddModal()" class="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form id="fullAddHabitForm" onsubmit="handleFullAddHabit(event)" class="mt-4 space-y-4">
+                <!-- Название привычки -->
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                        Название цели
+                    </label>
+                    <input 
+                        type="text" 
+                        id="modalHabitName" 
+                        required
+                        maxlength="60"
+                        placeholder="Например: Прогулка 10 000 шагов" 
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none text-sm font-medium"
+                    >
+                </div>
+
+                <!-- Выбор иконки / эмодзи -->
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                        Иконка привычки
+                    </label>
+                    <div id="emojiPickerGrid" class="grid grid-cols-6 gap-2">
+                        <!-- Заполняется через JS -->
+                    </div>
+                </div>
+
+                <!-- Выбор категории и цвета -->
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                        Категория и цветовой акцент
+                    </label>
+                    <div id="categoryPickerGrid" class="grid grid-cols-2 gap-2.5">
+                        <!-- Заполняется через JS -->
+                    </div>
+                </div>
+
+                <!-- Кнопки действия -->
+                <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" onclick="closeAddModal()" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer">
+                        Отмена
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/25 transition cursor-pointer">
+                        Создать привычку
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО: Подтверждение сброса демо-данных -->
+    <div id="resetConfirmModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl">
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center text-2xl mb-4">
+                🔄
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white">Сбросить демо-данные?</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                Все текущие изменения будут заменены исходным демонстрационным набором привычек с заполненной историей за неделю.
+            </p>
+            <div class="flex items-center justify-end gap-2.5 mt-6">
+                <button onclick="closeResetModal()" class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer">
+                    Отмена
+                </button>
+                <button onclick="confirmResetDemoData()" class="px-4 py-2 rounded-xl text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/20 transition cursor-pointer">
+                    Да, сбросить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Всплывающее уведомление (Toast) -->
+    <div id="toastNotification" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-300 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-sm font-semibold border border-slate-700/50 dark:border-slate-200">
+        <span id="toastEmoji">✨</span>
+        <span id="toastMessage">Действие выполнено</span>
+    </div>
+
+    <script>
+        // Ключи хранения в localStorage
+        const STORAGE_KEY_HABITS = 'impulse_habit_tracker_v1_data';
+        const STORAGE_KEY_THEME = 'impulse_habit_tracker_v1_theme';
+
+        // Справочник категорий и цветов
+        const CATEGORIES = {
+            health: {
+                id: 'health',
+                name: 'Здоровье',
+                badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+                checkBg: 'bg-emerald-500 border-emerald-500 text-white shadow-emerald-500/30',
+                cellActive: 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30',
+                dotColor: 'bg-emerald-500',
+                ringHover: 'hover:border-emerald-400'
+            },
+            productivity: {
+                id: 'productivity',
+                name: 'Продуктивность',
+                badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
+                checkBg: 'bg-indigo-600 border-indigo-600 text-white shadow-indigo-500/30',
+                cellActive: 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30',
+                dotColor: 'bg-indigo-500',
+                ringHover: 'hover:border-indigo-400'
+            },
+            sport: {
+                id: 'sport',
+                name: 'Спорт',
+                badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+                checkBg: 'bg-amber-500 border-amber-500 text-white shadow-amber-500/30',
+                cellActive: 'bg-amber-500 text-white shadow-sm shadow-amber-500/30',
+                dotColor: 'bg-amber-500',
+                ringHover: 'hover:border-amber-400'
+            },
+            learning: {
+                id: 'learning',
+                name: 'Обучение',
+                badgeClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+                checkBg: 'bg-purple-600 border-purple-600 text-white shadow-purple-500/30',
+                cellActive: 'bg-purple-600 text-white shadow-sm shadow-purple-500/30',
+                dotColor: 'bg-purple-500',
+                ringHover: 'hover:border-purple-400'
+            },
+            mindfulness: {
+                id: 'mindfulness',
+                name: 'Осознанность',
+                badgeClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+                checkBg: 'bg-rose-500 border-rose-500 text-white shadow-rose-500/30',
+                cellActive: 'bg-rose-500 text-white shadow-sm shadow-rose-500/30',
+                dotColor: 'bg-rose-500',
+                ringHover: 'hover:border-rose-400'
+            }
+        };
+
+        // Доступные эмодзи для выбора при создании новой привычки
+        const EMOJI_OPTIONS = ['💧', '📚', '🤸', '🥗', '💻', '🧘', '🏃', '🇬🇧', '💤', '🎸', '✍️', '🎯'];
+
+        // Глобальное состояние
+        let habits = [];
+        let selectedCategoryFilter = 'all';
+        let selectedModalEmoji = EMOJI_OPTIONS[0];
+        let selectedModalCategory = 'health';
+        let currentChartMode = 'bar'; // 'bar' | 'area'
+        let toastTimeout = null;
+
+        // Вспомогательные функции работы с датами (локальный формат YYYY-MM-DD)
+        function formatDateKey(dateObj) {
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getDateDaysAgo(daysAgo) {
+            const d = new Date();
+            d.setHours(12, 0, 0, 0);
+            d.setDate(d.getDate() - daysAgo);
+            return d;
+        }
+
+        function getTodayKey() {
+            return formatDateKey(getDateDaysAgo(0));
+        }
+
+        // Возвращает массив объектов за последние 7 дней (от 6 дней назад до сегодня)
+        function getLast7Days() {
+            const shortDayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+            const fullDayNames = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+            const days = [];
+            for (let i = 6; i >= 0; i--) {
+                const dateObj = getDateDaysAgo(i);
+                const dayIndex = dateObj.getDay();
+                days.push({
+                    key: formatDateKey(dateObj),
+                    shortName: shortDayNames[dayIndex],
+                    fullName: fullDayNames[dayIndex],
+                    dayNumber: dateObj.getDate(),
+                    isToday: i === 0
+                });
+            }
+            return days;
+        }
+
+        // Склонение слова "день" (1 день, 2 дня, 5 дней)
+        function pluralizeDays(count) {
+            const mod10 = count % 10;
+            const mod100 = count % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'день';
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'дня';
+            return 'дней';
+        }
+
+        // Генерация живых демо-данных при первом запуске или сбросе
+        function generateDefaultDemoHabits() {
+            // Создаём историю за последние 12 дней, чтобы стрики сразу выглядели реалистично
+            const createHistory = (activeOffsets) => {
+                const map = {};
+                activeOffsets.forEach(daysAgo => {
+                    map[formatDateKey(getDateDaysAgo(daysAgo))] = true;
+                });
+                return map;
+            };
+
+            return [
+                {
+                    id: 'demo-1',
+                    name: 'Выпить 2л чистой воды',
+                    icon: '💧',
+                    category: 'health',
+                    history: createHistory([0, 1, 2, 3, 4, 5, 6, 7]) // Стрик 8 дней
+                },
+                {
+                    id: 'demo-2',
+                    name: 'Утренняя зарядка и разминка',
+                    icon: '🤸',
+                    category: 'sport',
+                    history: createHistory([0, 1, 2, 3, 4, 6]) // Стрик 5 дней
+                },
+                {
+                    id: 'demo-3',
+                    name: 'Изучение кода и практики (1 час)',
+                    icon: '💻',
+                    category: 'learning',
+                    history: createHistory([0, 1, 2, 3, 5, 6]) // Стрик 4 дня
+                },
+                {
+                    id: 'demo-4',
+                    name: 'Чтение книги 30 минут',
+                    icon: '📚',
+                    category: 'mindfulness',
+                    history: createHistory([1, 2, 3, 5]) // Сегодня ещё не отмечено, но стрик 3 дня сохраняется!
+                },
+                {
+                    id: 'demo-5',
+                    name: 'День без фастфуда и сахара',
+                    icon: '🥗',
+                    category: 'health',
+                    history: createHistory([0, 1, 3, 4, 5]) // Стрик 2 дня
+                },
+                {
+                    id: 'demo-6',
+                    name: 'Планирование фокуса дня',
+                    icon: '🎯',
+                    category: 'productivity',
+                    history: createHistory([1, 2, 4, 6]) // Стрик 2 дня
+                }
+            ];
+        }
+
+        // Подсчет текущей серии (стрика) для привычки
+        // Если сегодня уже выполнено — считаем с сегодняшнего дня назад.
+        // Если сегодня ещё не отмечено, но вчера было выполнено — серия ещё не сгорела, считаем со вчерашнего дня.
+        function calculateCurrentStreak(habit) {
+            if (!habit || !habit.history) return 0;
+            let streak = 0;
+            const todayKey = formatDateKey(getDateDaysAgo(0));
+            const yesterdayKey = formatDateKey(getDateDaysAgo(1));
+
+            let startOffset = 0;
+            if (habit.history[todayKey]) {
+                startOffset = 0;
+            } else if (habit.history[yesterdayKey]) {
+                startOffset = 1;
+            } else {
+                return 0;
+            }
+
+            for (let i = startOffset; i < 365; i++) {
+                const key = formatDateKey(getDateDaysAgo(i));
+                if (habit.history[key]) {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+            return streak;
+        }
+
+        // Подсчет лучшей серии среди всех привычек
+        function getBestOverallStreak() {
+            let bestCount = 0;
+            let bestHabitTitle = 'Отметьте привычку для старта';
+
+            habits.forEach(habit => {
+                // Проверяем как текущий стрик, так и максимальный подряд за последние 30 дней
+                let currentRun = 0;
+                let maxHabitRun = 0;
+                for (let i = 30; i >= 0; i--) {
+                    const k = formatDateKey(getDateDaysAgo(i));
+                    if (habit.history && habit.history[k]) {
+                        currentRun++;
+                        if (currentRun > maxHabitRun) maxHabitRun = currentRun;
+                    } else {
+                        currentRun = 0;
+                    }
+                }
+                const liveStreak = calculateCurrentStreak(habit);
+                const candidate = Math.max(liveStreak, maxHabitRun);
+                if (candidate > bestCount) {
+                    bestCount = candidate;
+                    bestHabitTitle = `${habit.icon} ${habit.name}`;
+                }
+            });
+
+            return { count: bestCount, title: bestHabitTitle };
+        }
+
+        // Загрузка и сохранение состояния в localStorage
+        function loadState() {
+            try {
+                const savedTheme = localStorage.getItem(STORAGE_KEY_THEME);
+                if (savedTheme === 'light') {
+                    document.documentElement.classList.remove('dark');
+                } else {
+                    document.documentElement.classList.add('dark');
+                }
+
+                const raw = localStorage.getItem(STORAGE_KEY_HABITS);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        habits = parsed;
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.error('Ошибка чтения localStorage:', e);
+            }
+            habits = generateDefaultDemoHabits();
+            saveState();
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY_HABITS, JSON.stringify(habits));
+            } catch (e) {
+                console.error('Ошибка сохранения в localStorage:', e);
+            }
+        }
+
+        // Отображение текущей даты в шапке
+        function renderHeaderDate() {
+            const now = new Date();
+            const formatter = new Intl.DateTimeFormat('ru-RU', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+            let formatted = formatter.format(now);
+            formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+            document.getElementById('currentDateDisplay').textContent = formatted;
+        }
+
+        // Обновление верхних KPI карточек и мотивационных бейджей
+        function renderSummaryMetrics() {
+            const todayKey = getTodayKey();
+            const totalHabits = habits.length;
+            const completedToday = habits.filter(h => h.history && h.history[todayKey]).length;
+            const todayPercent = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0;
+
+            // 1. Карточка фокуса дня и SVG кольцо
+            document.getElementById('todayPercentText').textContent = `${todayPercent}%`;
+            document.getElementById('todayFractionText').textContent = `(${completedToday} из ${totalHabits})`;
+            document.getElementById('todayCounterPill').textContent = `${completedToday}/${totalHabits}`;
+            document.getElementById('progressBarLabel').textContent = `${todayPercent}%`;
+            document.getElementById('todayLinearBar').style.width = `${todayPercent}%`;
+
+            const circumference = 2 * Math.PI * 26; // r=26 -> ~163.36
+            const offset = circumference - (todayPercent / 100) * circumference;
+            const ringEl = document.getElementById('todayProgressRing');
+            ringEl.style.strokeDashoffset = offset;
+
+            const todaySubStatus = document.getElementById('todaySubStatus');
+            const todayRingIcon = document.getElementById('todayRingIcon');
+            if (totalHabits === 0) {
+                todaySubStatus.textContent = 'Добавьте первую цель';
+                todayRingIcon.textContent = '➕';
+            } else if (todayPercent === 100) {
+                todaySubStatus.textContent = 'Все цели на сегодня закрыты 🎉';
+                todayRingIcon.textContent = '🏆';
+            } else if (todayPercent >= 60) {
+                todaySubStatus.textContent = 'Отличный темп! Почти у цели';
+                todayRingIcon.textContent = '⚡';
+            } else if (todayPercent > 0) {
+                todaySubStatus.textContent = 'Хороший старт, продолжайте!';
+                todayRingIcon.textContent = '🎯';
+            } else {
+                todaySubStatus.textContent = 'Время сделать первый шаг';
+                todayRingIcon.textContent = '🌱';
+            }
+
+            // 2. Карточка лучшего стрика
+            const bestStreak = getBestOverallStreak();
+            document.getElementById('bestStreakValue').textContent = bestStreak.count;
+            document.getElementById('bestStreakUnit').textContent = `${pluralizeDays(bestStreak.count)} подряд`;
+            document.getElementById('bestStreakHabitName').textContent = bestStreak.title;
+
+            // 3. Карточка статистики за 7 дней
+            const days7 = getLast7Days();
+            let possibleChecks = totalHabits * 7;
+            let actualChecks = 0;
+            days7.forEach(d => {
+                habits.forEach(h => {
+                    if (h.history && h.history[d.key]) actualChecks++;
+                });
+            });
+            const weeklyRate = possibleChecks > 0 ? Math.round((actualChecks / possibleChecks) * 100) : 0;
+            document.getElementById('weeklyRateValue').textContent = `${weeklyRate}%`;
+            document.getElementById('weeklyTotalChecks').textContent = `${actualChecks} выполнено`;
+
+            const weeklyComparisonText = document.getElementById('weeklyComparisonText');
+            if (weeklyRate >= 80) {
+                weeklyComparisonText.textContent = '🔥 Выдающаяся дисциплина!';
+            } else if (weeklyRate >= 55) {
+                weeklyComparisonText.textContent = '✨ Уверенный прогресс недели';
+            } else {
+                weeklyComparisonText.textContent = '📈 Каждый шаг укрепляет серию';
+            }
+
+            // 4. Мотивационный блок и мини-бейджи
+            const motivationTitle = document.getElementById('motivationTitle');
+            const motivationEmoji = document.getElementById('motivationEmoji');
+            const badgesContainer = document.getElementById('badgesContainer');
+
+            if (todayPercent === 100 && totalHabits > 0) {
+                motivationTitle.textContent = 'Все цели на сегодня закрыты 🎉';
+                motivationEmoji.textContent = '👑';
+            } else if (todayPercent >= 50) {
+                motivationTitle.textContent = 'Отличный темп! Экватор пройден';
+                motivationEmoji.textContent = '🚀';
+            } else if (completedToday > 0) {
+                motivationTitle.textContent = 'Импульс запущен, так держать!';
+                motivationEmoji.textContent = '⚡';
+            } else {
+                motivationTitle.textContent = 'Готовы к продуктивному дню?';
+                motivationEmoji.textContent = '🌟';
+            }
+
+            // Генерация заслуженных мини-бейджей
+            const badges = [];
+            if (todayPercent === 100 && totalHabits > 0) {
+                badges.push({ icon: '🏅', text: '100% День' });
+            }
+            if (bestStreak.count >= 5) {
+                badges.push({ icon: '🔥', text: `Серия ${bestStreak.count} дн.` });
+            } else if (bestStreak.count >= 3) {
+                badges.push({ icon: '⚡', text: 'Разгон 3+ дня' });
+            }
+            if (weeklyRate >= 70) {
+                badges.push({ icon: '💎', text: 'Мастер недели' });
+            }
+            if (totalHabits >= 5) {
+                badges.push({ icon: '🧭', text: `${totalHabits} привычек` });
+            }
+            if (badges.length === 0) {
+                badges.push({ icon: '🌱', text: 'Новый старт' });
+            }
+
+            badgesContainer.innerHTML = badges.map(b => `
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/15 backdrop-blur-md text-white border border-white/15">
+                    <span>${b.icon}</span>
+                    <span>${b.text}</span>
+                </span>
+            `).join('');
+        }
+
+        // Отрисовка панели фильтра по категориям
+        function renderCategoryFilters() {
+            const container = document.getElementById('categoryFilterBar');
+            const filterItems = [
+                { id: 'all', name: 'Все цели', count: habits.length }
+            ];
+            Object.values(CATEGORIES).forEach(cat => {
+                const count = habits.filter(h => h.category === cat.id).length;
+                if (count > 0) {
+                    filterItems.push({ id: cat.id, name: cat.name, count });
+                }
+            });
+
+            container.innerHTML = filterItems.map(item => {
+                const isActive = selectedCategoryFilter === item.id;
+                const activeClasses = isActive
+                    ? 'bg-slate-900 text-white dark:bg-indigo-600 dark:text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800';
+                return `
+                    <button onclick="setCategoryFilter('${item.id}')" class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${activeClasses}">
+                        <span>${item.name}</span>
+                        <span class="opacity-75">(${item.count})</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function setCategoryFilter(categoryId) {
+            selectedCategoryFilter = categoryId;
+            renderAll();
+        }
+
+        // Отрисовка списка привычек на сегодня
+        function renderTodayHabitsList() {
+            const container = document.getElementById('todayHabitsList');
+            const todayKey = getTodayKey();
+
+            const filtered = selectedCategoryFilter === 'all'
+                ? habits
+                : habits.filter(h => h.category === selectedCategoryFilter);
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center text-center py-10 px-4 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                        <span class="text-3xl mb-2">✨</span>
+                        <p class="text-sm font-semibold text-slate-700 dark:text-slate-300">Список привычек пуст</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Добавьте новую цель на день, чтобы начать отслеживать прогресс</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(habit => {
+                const isDoneToday = !!(habit.history && habit.history[todayKey]);
+                const streak = calculateCurrentStreak(habit);
+                const cat = CATEGORIES[habit.category] || CATEGORIES.health;
+
+                // Считаем сколько дней за последние 7 выполнено
+                const last7 = getLast7Days();
+                const doneIn7 = last7.filter(d => habit.history && habit.history[d.key]).length;
+
+                return `
+                    <div class="group flex items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all duration-200 ${
+                        isDoneToday
+                            ? 'bg-slate-50/90 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800'
+                            : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800/90 hover:border-indigo-400/60 dark:hover:border-indigo-500/50 shadow-sm'
+                    }">
+                        <!-- Левая часть: Чекбокс + Иконка + Название -->
+                        <div class="flex items-center gap-3.5 min-w-0 flex-1 cursor-pointer" onclick="toggleHabitDate('${habit.id}', '${todayKey}')">
+                            <button 
+                                type="button"
+                                aria-label="Отметить выполнение"
+                                class="w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all duration-200 shrink-0 cursor-pointer ${
+                                    isDoneToday
+                                        ? `${cat.checkBg} shadow-md animate-check`
+                                        : `border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/90 ${cat.ringHover}`
+                                }"
+                            >
+                                ${isDoneToday ? `
+                                    <svg class="w-4 h-4 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                                    </svg>
+                                ` : ''}
+                            </button>
+
+                            <div class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl shrink-0">
+                                ${habit.icon}
+                            </div>
+
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold truncate transition-all ${
+                                    isDoneToday
+                                        ? 'line-through text-slate-400 dark:text-slate-500'
+                                        : 'text-slate-900 dark:text-slate-100'
+                                }">
+                                    ${escapeHtml(habit.name)}
+                                </p>
+                                <div class="flex flex-wrap items-center gap-2 mt-1">
+                                    <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md border ${cat.badgeClass}">
+                                        ${cat.name}
+                                    </span>
+                                    <span class="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                                        За неделю: ${doneIn7}/7
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Правая часть: Счетчик стрика и кнопка удаления -->
+                        <div class="flex items-center gap-2 shrink-0">
+                            <div title="Текущая непрерывная серия" class="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold ${
+                                streak > 0
+                                    ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
+                            }">
+                                <span class="${streak > 0 ? 'flame-active' : 'opacity-50'}">🔥</span>
+                                <span>${streak}</span>
+                            </div>
+
+                            <button 
+                                type="button"
+                                onclick="deleteHabit('${habit.id}')" 
+                                title="Удалить привычку"
+                                class="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 opacity-70 group-hover:opacity-100 transition cursor-pointer"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Отрисовка интерактивной таблицы за 7 дней
+        function renderWeeklyMatrix() {
+            const days7 = getLast7Days();
+            const headerEl = document.getElementById('weeklyTableHeader');
+            const bodyEl = document.getElementById('weeklyTableBody');
+
+            // Шапка таблицы
+            headerEl.innerHTML = `
+                <th class="py-2.5 pr-3 font-semibold text-slate-500 dark:text-slate-400">Привычка</th>
+                ${days7.map(d => `
+                    <th class="py-2.5 px-1.5 text-center">
+                        <div class="inline-flex flex-col items-center px-2 py-1 rounded-xl ${
+                            d.isToday
+                                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                                : 'text-slate-500 dark:text-slate-400'
+                        }">
+                            <span class="text-[11px] font-bold uppercase">${d.shortName}</span>
+                            <span class="text-xs font-extrabold mt-0.5">${d.dayNumber}</span>
+                        </div>
+                    </th>
+                `).join('')}
+                <th class="py-2.5 pl-2 text-right font-semibold text-slate-500 dark:text-slate-400">Серия</th>
+            `;
+
+            if (habits.length === 0) {
+                bodyEl.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="py-8 text-center text-slate-400 dark:text-slate-500 text-sm">
+                            Нет активных привычек для отображения матрицы
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // Строки по каждой привычке
+            bodyEl.innerHTML = habits.map(habit => {
+                const cat = CATEGORIES[habit.category] || CATEGORIES.health;
+                const streak = calculateCurrentStreak(habit);
+
+                return `
+                    <tr class="group hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                        <td class="py-3 pr-3 max-w-[190px]">
+                            <div class="flex items-center gap-2.5">
+                                <span class="text-lg shrink-0">${habit.icon}</span>
+                                <span class="font-semibold text-slate-800 dark:text-slate-200 truncate text-xs sm:text-sm" title="${escapeHtml(habit.name)}">
+                                    ${escapeHtml(habit.name)}
+                                </span>
+                            </div>
+                        </td>
+                        ${days7.map(d => {
+                            const done = !!(habit.history && habit.history[d.key]);
+                            return `
+                                <td class="py-2.5 px-1.5 text-center">
+                                    <button
+                                        type="button"
+                                        onclick="toggleHabitDate('${habit.id}', '${d.key}')"
+                                        title="${escapeHtml(habit.name)} — ${d.fullName} (${d.dayNumber})"
+                                        class="w-8 h-8 rounded-xl mx-auto flex items-center justify-center transition-all duration-150 cursor-pointer ${
+                                            done
+                                                ? `${cat.cellActive} animate-check`
+                                                : d.isToday
+                                                    ? 'bg-indigo-50/70 dark:bg-slate-800 border-2 border-dashed border-indigo-400/70 dark:border-indigo-500/60 hover:bg-indigo-100 dark:hover:bg-slate-700'
+                                                    : 'bg-slate-100 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 hover:border-slate-400 dark:hover:border-slate-500'
+                                        }"
+                                    >
+                                        ${done ? `
+                                            <svg class="w-4 h-4 stroke-[2.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                                            </svg>
+                                        ` : ''}
+                                    </button>
+                                </td>
+                            `;
+                        }).join('')}
+                        <td class="py-3 pl-2 text-right">
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold ${
+                                streak > 0
+                                    ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                                    : 'text-slate-400 dark:text-slate-500'
+                            }">
+                                🔥 ${streak}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Отрисовка визуального графика активности за 7 дней (Столбчатый + Плавный SVG)
+        function renderWeeklyChart() {
+            const days7 = getLast7Days();
+            const totalHabits = habits.length;
+
+            // Собираем статистику по каждому из 7 дней
+            const stats = days7.map(d => {
+                const completedCount = habits.filter(h => h.history && h.history[d.key]).length;
+                const percent = totalHabits > 0 ? Math.round((completedCount / totalHabits) * 100) : 0;
+                return {
+                    ...d,
+                    completedCount,
+                    totalHabits,
+                    percent
+                };
+            });
+
+            // 1. Рендеринг столбчатой диаграммы
+            const barContainer = document.getElementById('barChartContainer');
+            barContainer.innerHTML = stats.map(st => {
+                const barHeight = Math.max(st.percent, 8); // Минимальная высота 8% для эстетики
+                let barGradient = 'from-indigo-500 to-purple-500';
+                if (st.percent === 100 && st.totalHabits > 0) {
+                    barGradient = 'from-emerald-500 to-teal-400';
+                } else if (st.isToday) {
+                    barGradient = 'from-indigo-600 via-indigo-500 to-emerald-400';
+                }
+
+                return `
+                    <div class="flex flex-col items-center h-full justify-end group">
+                        <!-- Процент сверху столбца -->
+                        <div class="mb-1.5 text-center">
+                            <span class="block text-xs font-bold ${
+                                st.percent === 100 && st.totalHabits > 0
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : st.isToday
+                                        ? 'text-indigo-600 dark:text-indigo-400'
+                                        : 'text-slate-600 dark:text-slate-400'
+                            }">${st.percent}%</span>
+                            <span class="block text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                ${st.completedCount}/${st.totalHabits}
+                            </span>
+                        </div>
+
+                        <!-- Трек и сам столбец -->
+                        <div class="w-full max-w-[46px] h-32 bg-slate-100 dark:bg-slate-800/80 rounded-2xl p-1 flex items-end overflow-hidden border border-slate-200/60 dark:border-slate-800">
+                            <div 
+                                class="w-full rounded-xl bg-gradient-to-t ${barGradient} transition-all duration-500 ease-out shadow-sm"
+                                style="height: ${barHeight}%"
+                            ></div>
+                        </div>
+
+                        <!-- Подпись дня -->
+                        <div class="mt-2 text-center">
+                            <span class="text-xs font-bold ${
+                                st.isToday
+                                    ? 'text-indigo-600 dark:text-indigo-400'
+                                    : 'text-slate-600 dark:text-slate-400'
+                            }">${st.shortName}</span>
+                            <span class="block text-[10px] text-slate-400 dark:text-slate-500">
+                                ${st.isToday ? 'Сегодня' : st.dayNumber}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // 2. Рендеринг плавного SVG-графика (Area Chart)
+            const svgWrapper = document.getElementById('svgChartWrapper');
+            const labelsWrapper = document.getElementById('areaChartLabels');
+
+            const width = 600;
+            const height = 145;
+            const padX = 28;
+            const padY = 22;
+            const usableW = width - padX * 2;
+            const usableH = height - padY * 2;
+
+            const points = stats.map((st, idx) => {
+                const x = padX + (idx / (stats.length - 1)) * usableW;
+                const y = padY + usableH - (st.percent / 100) * usableH;
+                return { x, y, ...st };
+            });
+
+            // Построение плавной кривой Безье
+            let pathD = `M ${points[0].x} ${points[0].y}`;
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = points[i];
+                const p1 = points[i + 1];
+                const cpx1 = p0.x + (p1.x - p0.x) / 2;
+                const cpy1 = p0.y;
+                const cpx2 = p0.x + (p1.x - p0.x) / 2;
+                const cpy2 = p1.y;
+                pathD += ` C ${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${p1.x} ${p1.y}`;
+            }
+
+            const areaD = `${pathD} L ${points[points.length - 1].x} ${height - 6} L ${points[0].x} ${height - 6} Z`;
+
+            svgWrapper.innerHTML = `
+                <svg viewBox="0 0 ${width} ${height}" class="w-full h-full overflow-visible">
+                    <defs>
+                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#6366f1" stop-opacity="0.42"/>
+                            <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+                        </linearGradient>
+                        <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stop-color="#6366f1"/>
+                            <stop offset="50%" stop-color="#a855f7"/>
+                            <stop offset="100%" stop-color="#10b981"/>
+                        </linearGradient>
+                    </defs>
+
+                    <!-- Горизонтальные направляющие -->
+                    <line x1="${padX}" y1="${padY}" x2="${width - padX}" y2="${padY}" stroke="currentColor" class="text-slate-200 dark:text-slate-800" stroke-dasharray="4 4" stroke-width="1"/>
+                    <line x1="${padX}" y1="${padY + usableH / 2}" x2="${width - padX}" y2="${padY + usableH / 2}" stroke="currentColor" class="text-slate-200 dark:text-slate-800" stroke-dasharray="4 4" stroke-width="1"/>
+                    <line x1="${padX}" y1="${padY + usableH}" x2="${width - padX}" y2="${padY + usableH}" stroke="currentColor" class="text-slate-200 dark:text-slate-800" stroke-width="1"/>
+
+                    <!-- Заливка под кривой -->
+                    <path d="${areaD}" fill="url(#areaGrad)"/>
+
+                    <!-- Сглаженная линия -->
+                    <path d="${pathD}" fill="none" stroke="url(#lineGrad)" stroke-width="3.5" stroke-linecap="round"/>
+
+                    <!-- Точки и значения -->
+                    ${points.map(pt => `
+                        <g>
+                            <circle cx="${pt.x}" cy="${pt.y}" r="${pt.isToday ? 6 : 4.5}" class="fill-white dark:fill-slate-900" stroke="${pt.percent === 100 ? '#10b981' : '#6366f1'}" stroke-width="3"/>
+                            <text x="${pt.x}" y="${pt.y - 10}" text-anchor="middle" class="fill-slate-700 dark:fill-slate-200 text-[11px] font-bold">${pt.percent}%</text>
+                        </g>
+                    `).join('')}
+                </svg>
+            `;
+
+            labelsWrapper.innerHTML = stats.map(st => `
+                <div>
+                    <span class="text-xs font-bold ${st.isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}">${st.shortName}</span>
+                    <span class="block text-[10px] text-slate-400 dark:text-slate-500">${st.completedCount}/${st.totalHabits}</span>
+                </div>
+            `).join('');
+
+            // 3. Нижняя строка аналитики по категориям и лучший день
+            const breakdownEl = document.getElementById('categoryBreakdownList');
+            const categoryStats = Object.values(CATEGORIES).map(cat => {
+                const count = habits.filter(h => h.category === cat.id).length;
+                return { ...cat, count };
+            }).filter(c => c.count > 0);
+
+            breakdownEl.innerHTML = categoryStats.map(c => `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 font-medium">
+                    <span class="w-2 h-2 rounded-full ${c.dotColor}"></span>
+                    <span>${c.name}: <strong>${c.count}</strong></span>
+                </span>
+            `).join('');
+
+            // Определяем самый продуктивный день за 7 дней
+            const bestDay = [...stats].sort((a, b) => b.completedCount - a.completedCount)[0];
+            const bestDayEl = document.getElementById('bestDayInsight');
+            if (bestDay && bestDay.completedCount > 0) {
+                bestDayEl.innerHTML = `Лучший день недели: <strong class="text-slate-800 dark:text-slate-200">${bestDay.fullName} (${bestDay.percent}%)</strong>`;
+            } else {
+                bestDayEl.textContent = 'Отмечайте привычки, чтобы увидеть лучший день недели';
+            }
+        }
+
+        function setChartMode(mode) {
+            currentChartMode = mode;
+            const barContainer = document.getElementById('barChartContainer');
+            const areaContainer = document.getElementById('areaChartContainer');
+            const barBtn = document.getElementById('chartModeBarBtn');
+            const lineBtn = document.getElementById('chartModeLineBtn');
+
+            const activeClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm';
+            const inactiveClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
+
+            if (mode === 'bar') {
+                barContainer.classList.remove('hidden');
+                areaContainer.classList.add('hidden');
+                barBtn.className = activeClass;
+                lineBtn.className = inactiveClass;
+            } else {
+                barContainer.classList.add('hidden');
+                areaContainer.classList.remove('hidden');
+                lineBtn.className = activeClass;
+                barBtn.className = inactiveClass;
+            }
+        }
+
+        // Переключение выполнения привычки за конкретную дату
+        function toggleHabitDate(habitId, dateKey) {
+            const habit = habits.find(h => h.id === habitId);
+            if (!habit) return;
+            if (!habit.history) habit.history = {};
+
+            const wasDone = !!habit.history[dateKey];
+            if (wasDone) {
+                delete habit.history[dateKey];
+            } else {
+                habit.history[dateKey] = true;
+            }
+
+            saveState();
+            renderAll();
+
+            // Если отметили сегодня и закрыли 100% целей — показываем праздничное уведомление
+            if (!wasDone && dateKey === getTodayKey()) {
+                const allDone = habits.length > 0 && habits.every(h => h.history && h.history[dateKey]);
+                if (allDone) {
+                    showToast('🎉', 'Поздравляем! Все цели на сегодня выполнены на 100%!');
+                }
+            }
+        }
+
+        // Удаление привычки
+        function deleteHabit(habitId) {
+            const target = habits.find(h => h.id === habitId);
+            if (!target) return;
+            habits = habits.filter(h => h.id !== habitId);
+            saveState();
+            renderAll();
+            showToast('🗑️', `Привычка «${target.name}» удалена`);
+        }
+
+        // Быстрое добавление из нижней строки
+        function handleQuickAdd(event) {
+            event.preventDefault();
+            const input = document.getElementById('quickAddInput');
+            const name = input.value.trim();
+            if (!name) return;
+
+            const newHabit = {
+                id: 'habit-' + Date.now(),
+                name,
+                icon: '⚡',
+                category: selectedCategoryFilter !== 'all' ? selectedCategoryFilter : 'productivity',
+                history: {}
+            };
+
+            habits.unshift(newHabit);
+            input.value = '';
+            saveState();
+            renderAll();
+            showToast('✨', `Добавлена цель «${name}»`);
+        }
+
+        // Модальное окно создания привычки с выбором иконки и категории
+        function renderModalPickers() {
+            const emojiGrid = document.getElementById('emojiPickerGrid');
+            emojiGrid.innerHTML = EMOJI_OPTIONS.map(emoji => {
+                const isSelected = emoji === selectedModalEmoji;
+                return `
+                    <button
+                        type="button"
+                        onclick="selectModalEmoji('${emoji}')"
+                        class="h-11 rounded-xl text-xl flex items-center justify-center border transition cursor-pointer ${
+                            isSelected
+                                ? 'bg-indigo-500/15 border-indigo-500 ring-2 ring-indigo-500/30 scale-105'
+                                : 'bg-slate-100 dark:bg-slate-800 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }"
+                    >
+                        ${emoji}
+                    </button>
+                `;
+            }).join('');
+
+            const catGrid = document.getElementById('categoryPickerGrid');
+            catGrid.innerHTML = Object.values(CATEGORIES).map(cat => {
+                const isSelected = cat.id === selectedModalCategory;
+                return `
+                    <button
+                        type="button"
+                        onclick="selectModalCategory('${cat.id}')"
+                        class="px-3 py-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
+                            isSelected
+                                ? 'bg-indigo-500/10 dark:bg-indigo-500/15 border-indigo-500 ring-2 ring-indigo-500/20'
+                                : 'bg-slate-50 dark:bg-slate-800/70 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }"
+                    >
+                        <span class="w-3 h-3 rounded-full ${cat.dotColor} shrink-0"></span>
+                        <span class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">${cat.name}</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function selectModalEmoji(emoji) {
+            selectedModalEmoji = emoji;
+            renderModalPickers();
+        }
+
+        function selectModalCategory(catId) {
+            selectedModalCategory = catId;
+            renderModalPickers();
+        }
+
+        function openAddModal() {
+            selectedModalEmoji = EMOJI_OPTIONS[0];
+            selectedModalCategory = 'health';
+            renderModalPickers();
+            const modal = document.getElementById('addHabitModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                document.getElementById('modalHabitName').focus();
+            }, 50);
+        }
+
+        function closeAddModal() {
+            const modal = document.getElementById('addHabitModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('fullAddHabitForm').reset();
+        }
+
+        function handleFullAddHabit(event) {
+            event.preventDefault();
+            const nameInput = document.getElementById('modalHabitName');
+            const name = nameInput.value.trim();
+            if (!name) return;
+
+            const newHabit = {
+                id: 'habit-' + Date.now(),
+                name,
+                icon: selectedModalEmoji,
+                category: selectedModalCategory,
+                history: {}
+            };
+
+            habits.unshift(newHabit);
+            saveState();
+            closeAddModal();
+            renderAll();
+            showToast(selectedModalEmoji, `Привычка «${name}» создана!`);
+        }
+
+        // Модальное окно сброса демо-данных
+        function openResetModal() {
+            const modal = document.getElementById('resetConfirmModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeResetModal() {
+            const modal = document.getElementById('resetConfirmModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function confirmResetDemoData() {
+            habits = generateDefaultDemoHabits();
+            selectedCategoryFilter = 'all';
+            saveState();
+            closeResetModal();
+            renderAll();
+            showToast('🔄', 'Демонстрационные данные восстановлены');
+        }
+
+        // Переключение светлой и темной темы
+        function toggleTheme() {
+            const htmlEl = document.documentElement;
+            const isDark = htmlEl.classList.toggle('dark');
+            try {
+                localStorage.setItem(STORAGE_KEY_THEME, isDark ? 'dark' : 'light');
+            } catch (e) {}
+            showToast(isDark ? '🌙' : '☀️', isDark ? 'Темная тема включена' : 'Светлая тема включена');
+        }
+
+        // Показ всплывающего уведомления
+        function showToast(emoji, message) {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastEmoji').textContent = emoji;
+            document.getElementById('toastMessage').textContent = message;
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+                toast.classList.remove('translate-y-0', 'opacity-100');
+            }, 3000);
+        }
+
+        // Защита от XSS при выводе пользовательского текста
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Полная перерисовка всех компонентов интерфейса
+        function renderAll() {
+            renderHeaderDate();
+            renderSummaryMetrics();
+            renderCategoryFilters();
+            renderTodayHabitsList();
+            renderWeeklyMatrix();
+            renderWeeklyChart();
+        }
+
+        // Закрытие модальных окон по нажатию клавиши Escape
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeAddModal();
+                closeResetModal();
+            }
+        });
+
+        // Инициализация приложения при загрузке страницы
+        window.onload = function () {
+            loadState();
+            renderAll();
+        };
+    </script>
+</body>
+</html>
